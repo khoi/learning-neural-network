@@ -193,14 +193,6 @@ func backward(_ v: Value) {
     }
 }
 
-func traverse(_ v: Value) {
-    print(v)
-    v.children.forEach {
-        traverse($0)
-    }
-}
-
-
 let x1 = Value(2.0, label: "x1")
 let x2 = Value(0.0, label: "x2")
 
@@ -229,11 +221,14 @@ out.label = "o"
 
 
 backward(out)
-traverse(out)
 
 final class Neuron {
     let weights: [Value]
     let bias: Value
+    
+    var parameters: [Value] {
+        weights + [bias]
+    }
     
     init(numberOfInputs: Int) {
         self.weights = (0..<numberOfInputs).map { _ in Value(Double.random(in: -1...1)) }
@@ -255,6 +250,10 @@ final class Neuron {
 final class Layer {
     let neurons: [Neuron]
     
+    var parameters: [Value] {
+        neurons.flatMap(\.parameters)
+    }
+    
     init(numberOfInputs: Int, numberOfOutputs: Int) {
         self.neurons = (0..<numberOfOutputs).map { _ in
             Neuron(numberOfInputs: numberOfInputs)
@@ -268,14 +267,16 @@ final class Layer {
 
 final class MLP {
     let layers: [Layer]
+    
+    var parameters: [Value] {
+        layers.flatMap(\.parameters)
+    }
 
     init(numberOfInputs: Int, numberOfOutputs: [Int]) {
         let allLayers = [numberOfInputs] + numberOfOutputs
         self.layers = (0..<numberOfOutputs.count).map {
             Layer(numberOfInputs: allLayers[$0], numberOfOutputs: allLayers[$0+1])
         }
-        
-        print(layers.count)
     }
     
     func callAsFunction(_ x: [Value]) -> [Value] {
@@ -287,6 +288,33 @@ final class MLP {
     }
 }
 
-let x: [Value] = [2.0, 3.0, -1.0]
 let mlp = MLP(numberOfInputs: 3, numberOfOutputs: [4, 4, 1])
-mlp(x)
+
+let xs: [[Value]] = [
+    [2.0, 3.0, -1.0],
+    [3.0, -1.0, 0.5],
+    [0.5, 1.0, 1.0],
+    [1.0, 1.0, -1.0],
+]
+let ys: [Value] = [1.0, -1.0, -1.0, 1.0]
+
+for i in (0..<10) {
+    print("__ iteration \(i) __")
+    let yPred = xs.map { mlp($0)[0] }
+    
+    // forward pass
+    let loss = zip(ys, yPred).map { ($0 - $1).pow(2) }.reduce(0, +)
+    print("\t loss \(loss)")
+    
+    // backward pass
+    backward(loss)
+    
+    // update
+    let stepSize = 0.05
+    for p in mlp.parameters {
+        p.data += p.grad * -stepSize
+    }
+
+}
+
+
