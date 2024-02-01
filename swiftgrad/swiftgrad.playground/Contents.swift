@@ -173,24 +173,24 @@ func backward(_ v: Value) {
     var topo = [Value]()
     var visited = Set<Value>()
     
-    func buildTopo(_ n: Value) {
-        guard !visited.contains(n) else {
-            return
-        }
-        
-        visited.insert(n)
-        n.children.forEach { child in
-            buildTopo(child)
-        }
-        topo.append(n)
-    }
-    
-    buildTopo(v)
+    buildTopo(v, visited: &visited, result: &topo)
     
     v.grad = 1
     for v in topo.reversed() {
         v.backward?()
     }
+}
+
+func buildTopo(_ n: Value, visited: inout Set<Value>, result: inout [Value]) {
+    guard !visited.contains(n) else {
+        return
+    }
+    
+    visited.insert(n)
+    n.children.forEach { child in
+        buildTopo(child, visited: &visited, result: &result)
+    }
+    result.append(n)
 }
 
 let x1 = Value(2.0, label: "x1")
@@ -299,7 +299,7 @@ let xs: [[Value]] = [
 let ys: [Value] = [1.0, -1.0, -1.0, 1.0]
 
 var loss: Value
-for i in (0..<5) {
+for i in (0..<20) {
     print("__ iteration \(i) __")
     let yPred = xs.map { mlp($0)[0] }
     
