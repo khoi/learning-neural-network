@@ -230,3 +230,63 @@ out.label = "o"
 
 backward(out)
 traverse(out)
+
+final class Neuron {
+    let weights: [Value]
+    let bias: Value
+    
+    init(numberOfInputs: Int) {
+        self.weights = (0..<numberOfInputs).map { _ in Value(Double.random(in: -1...1)) }
+        self.bias = Value(Double.random(in: -1...1))
+    }
+    
+    func callAsFunction(_ x: [Value]) -> Value {
+        assert(x.count == weights.count, "inputs and weights count mismatch")
+        
+        let activation = zip(x, weights).reduce(bias, {
+            $0 + $1.0 * $1.1
+        })
+        
+        let out = activation.tanh()
+        return out
+    }
+}
+
+final class Layer {
+    let neurons: [Neuron]
+    
+    init(numberOfInputs: Int, numberOfOutputs: Int) {
+        self.neurons = (0..<numberOfOutputs).map { _ in
+            Neuron(numberOfInputs: numberOfInputs)
+        }
+    }
+    
+    func callAsFunction(_ x: [Value]) -> [Value] {
+        neurons.map { $0(x) }
+    }
+}
+
+final class MLP {
+    let layers: [Layer]
+
+    init(numberOfInputs: Int, numberOfOutputs: [Int]) {
+        let allLayers = [numberOfInputs] + numberOfOutputs
+        self.layers = (0..<numberOfOutputs.count).map {
+            Layer(numberOfInputs: allLayers[$0], numberOfOutputs: allLayers[$0+1])
+        }
+        
+        print(layers.count)
+    }
+    
+    func callAsFunction(_ x: [Value]) -> [Value] {
+        var x = x
+        layers.forEach {
+            x = $0(x)
+        }
+        return x
+    }
+}
+
+let x: [Value] = [2.0, 3.0, -1.0]
+let mlp = MLP(numberOfInputs: 3, numberOfOutputs: [4, 4, 1])
+mlp(x)
