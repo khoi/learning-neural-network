@@ -6,6 +6,9 @@ final class Value {
         case add
         case multiply
         case tanh
+        case exp
+        case pow
+        case substract
         
         var description: String {
             switch self {
@@ -15,6 +18,12 @@ final class Value {
                 "*"
             case .tanh:
                 "tanh"
+            case .exp:
+                "exp"
+            case .pow:
+                "**"
+            case .substract:
+                "-"
             }
         }
     }
@@ -43,15 +52,19 @@ final class Value {
     
 }
 
-extension Value: ExpressibleByFloatLiteral {
+extension Value: ExpressibleByFloatLiteral, ExpressibleByIntegerLiteral {
     convenience init(floatLiteral value: Double) {
         self.init(value)
+    }
+    
+    convenience init(integerLiteral value: IntegerLiteralType) {
+        self.init(Double(value))
     }
 }
 
 extension Value: CustomStringConvertible {
     var description: String {
-        String(format: "%@ | data %.4f | grad: %.4f", label ?? "", data, grad)
+        String(format: "%@ | op %@ | data %.4f | grad: %.4f", label ?? "", op?.description ?? "", data, grad)
     }
 }
 
@@ -71,6 +84,21 @@ extension Value: Equatable, Hashable {
 
 // expressions
 extension Value {
+    func exp() -> Value {
+        let v = Darwin.exp(data)
+        let out = Value(
+            v,
+            children: [self],
+            op: .exp
+        )
+        
+        out.backward = { [unowned self] in
+            self.grad += out.data * out.grad
+        }
+        
+        return out
+    }
+    
     func tanh() -> Value {
         let t = Darwin.tanh(data)
         let out = Value(
@@ -80,7 +108,21 @@ extension Value {
         )
         
         out.backward = { [unowned self] in
-            self.grad += (1 - pow(t, 2)) * out.grad
+            self.grad += (1 - Darwin.pow(t, 2)) * out.grad
+        }
+        
+        return out
+    }
+    
+    func pow(_ n: Double) -> Value {
+        let out = Value(
+            Darwin.pow(data, n),
+            children: [self],
+            op: .pow
+        )
+        
+        out.backward = { [unowned self] in
+            self.grad += n * Darwin.pow(data, n - 1)
         }
         
         return out
@@ -101,6 +143,10 @@ extension Value {
         return out
     }
     
+    static func -(lhs: Value, rhs: Value) -> Value {
+        lhs + (rhs * -1)
+    }
+    
     static func *(lhs: Value, rhs: Value) -> Value {
         let out = Value(
             lhs.data * rhs.data,
@@ -114,6 +160,12 @@ extension Value {
         }
         
         return out
+    }
+    
+    static func /(lhs: Value, rhs: Value) -> Value {
+        // division is just a special case of exponential
+        // a / b = a * (1/b) = 1 * (b**-1)
+        lhs * rhs.pow(-1)
     }
 }
 
@@ -152,6 +204,7 @@ func traverse(_ v: Value) {
 let x1 = Value(2.0, label: "x1")
 let x2 = Value(0.0, label: "x2")
 
+
 let w1 = Value(-3.0, label: "w1")
 let w2 = Value(1.0, label: "w2")
 
@@ -169,8 +222,11 @@ x1w1x2w2.label = "x1*w1 + x2*w2"
 let n = x1w1x2w2 + b
 n.label = "n"
 
-var out = n.tanh()
+//var out = n.tanh()
+var e = (2 * n).exp(); e.label = "e"
+var out = (e - 1) / (e + 1) // broken down of tanh
 out.label = "o"
+
 
 backward(out)
 traverse(out)
