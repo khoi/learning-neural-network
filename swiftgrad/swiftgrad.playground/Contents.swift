@@ -298,13 +298,19 @@ let xs: [[Value]] = [
 ]
 let ys: [Value] = [1.0, -1.0, -1.0, 1.0]
 
-for i in (0..<10) {
+var loss: Value
+for i in (0..<5) {
     print("__ iteration \(i) __")
     let yPred = xs.map { mlp($0)[0] }
     
     // forward pass
-    let loss = zip(ys, yPred).map { ($0 - $1).pow(2) }.reduce(0, +)
-    print("\t loss \(loss)")
+    loss = zip(ys, yPred).map { ($0 - $1).pow(2) }.reduce(0, +)
+    print("\t loss \(loss.data)")
+    loss.data
+    // zero out the old grads
+    for p in mlp.parameters {
+        p.grad = 0.0
+    }
     
     // backward pass
     backward(loss)
@@ -314,7 +320,6 @@ for i in (0..<10) {
     for p in mlp.parameters {
         p.data += p.grad * -stepSize
     }
-
 }
 
 
